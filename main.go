@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/draw"
 	"image/gif"
 	"image/png"
 	"os"
@@ -14,8 +13,9 @@ import (
 
 	"golang.org/x/image/font"
 
+	"canvas/lib"
+
 	"github.com/disintegration/gift"
-	"github.com/ericpauley/go-quantize/quantize"
 	"github.com/fogleman/gg"
 )
 
@@ -122,15 +122,24 @@ func mask(filename string) (*gg.Context, error) {
 
 // this is the frame function optimized for gif frames
 // this automatically adapts to the image resolutions
-func minimalist_frame_gif(img image.Image, font font.Face, text string) *gg.Context {
+func minimalist_frame_gif(img *image.Paletted, font font.Face, text string) *gg.Context {
 	screenWidth := img.Bounds().Max.X;
 	screenHeight := img.Bounds().Max.Y;
 
 	dc := gg.NewContext(screenWidth, screenHeight);
 
 	if screenHeight > 500 || screenWidth > 500 {
-		resizer := gift.New(
-			gift.Resize(500, 0, gift.LanczosResampling),
+		var newWidth, newHeight int 
+		// it should handle multiple image resolutions.
+		if screenHeight > screenWidth {
+			newHeight = 0
+			newWidth = screenWidth
+		} else {
+			newHeight = screenHeight
+			newWidth = 0
+		}
+		resizer := gift.New( // downscaling
+			gift.Resize(newWidth, newHeight, gift.LanczosResampling),
 		)
 		dst := image.NewRGBA(resizer.Bounds(img.Bounds()))
 		resizer.Draw(dst, img)
@@ -139,16 +148,34 @@ func minimalist_frame_gif(img image.Image, font font.Face, text string) *gg.Cont
 		dc.DrawImage(img, 0, 0);
 	}
 
+	var average_luminosity uint32 = 0;
+	var pixels_sampled uint32 = 0;
+	underlying_img := dc.Image();
+	for x := dc.Width() / 2; x < dc.Width(); x += 50 {
+		for y := dc.Height() / 4; y < dc.Height(); y += 50 {
+			r, g, b, _ := underlying_img.At(x, y).RGBA();
+			average_luminosity += uint32((0.299 * float64(r) + 0.587 * float64(g) + 0.114 * float64(b)) / 256);
+			pixels_sampled++;
+		}
+	}
+	average_luminosity /= pixels_sampled;
+
+	dc.SetFontFace(font);
+	dc.SetColor(color.RGBA{R: 0, G: 0, B: 0, A: 100})
+	dc.DrawString(fmt.Sprintf("lum: %v", average_luminosity), 0, float64(screenHeight) / 2);
+	dc.SetFontFace(font);
+	dc.SetColor(color.RGBA{R: 0, G: 0, B: 0, A: 100})
+	dc.DrawString(fmt.Sprintf("pixels: %v", pixels_sampled), 0, float64(screenHeight) / 2 + 50);
+
 	dc.SetRGB(1, 1, 1);
 	dc.DrawRectangle(0, 0, float64(screenWidth), float64(screenHeight));
+	// dc.DrawRectangle(float64(dc.Width()) / 2, float64(dc.Height()) / 4, float64(dc.Width()), float64(dc.Height()) / 2);
 	dc.SetLineWidth(10);
 	dc.Stroke();
 
 	dc.SetColor(color.RGBA{R: 255, G: 255, B: 255, A: 200})
-	dc.SetFontFace(font);
-	
 	dc.DrawStringWrapped(
-		strings.Repeat(text, 1),
+		text,
 		float64(dc.Width()), // x
 		float64(dc.Height()) / 2, // y
 		/*
@@ -187,7 +214,7 @@ func minimalist_frame_img(img image.Image, font font.Face, text string) *gg.Cont
 	}
 
 	filter := gift.New(
-		gift.Resize(newWidth, newHeight, gift.BoxResampling),
+		gift.Resize(newWidth, newHeight, gift.LinearResampling),
 	)
 	dst := image.NewRGBA(filter.Bounds(img.Bounds()))
 	filter.Draw(dst, img)
@@ -240,7 +267,7 @@ func main() {
 		panic(err);
 	}
 	
-	f, err := os.Create("./images/res.gif");
+	f, err := os.Create("./images/res_bright.gif");
 	if err != nil {
 		panic(err);
 	}
@@ -249,19 +276,19 @@ func main() {
 	defer timer("gif")();
 
 	newGif := &gif.GIF{};
+	quantizer := mediancut.MedianCutQuantizer{NumColor: 256};
+
 	for i := 0; i < len(g.Image); i++ {
-		img := g.Image[i];
+		img := g.Image[i]; // PalettedImage because
+							// this image was grabbed from a gif.
 		delay := g.Delay[i];
 
 		dc := minimalist_frame_gif(img, font, "You're beautiful.");
 
-		q := quantize.MedianCutQuantizer{};
-		colorPalette := q.Quantize(make(color.Palette, 0, 256), dc.Image())
-
-		bounds := dc.Image().Bounds()
-		palettedImage := image.NewPaletted(bounds, colorPalette);
-		// massive slowdown?
-		draw.Draw(palettedImage, bounds, dc.Image(), bounds.Min, draw.Src);
+		dc_img := dc.Image();
+		bounds := dc_img.Bounds();
+		palettedImage := image.NewPaletted(bounds, nil);
+		quantizer.Quantize(palettedImage, bounds, dc_img, bounds.Min);
 
 		newGif.Image = append(newGif.Image, palettedImage);
 		newGif.Delay = append(newGif.Delay, delay);

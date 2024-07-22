@@ -8,7 +8,4 @@ require (
 	golang.org/x/image v0.18.0
 )
 
-require (
-	github.com/ericpauley/go-quantize v0.0.0-20200331213906-ae555eb2afa4
-	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
-)
+require github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0 // indirect
