@@ -5,7 +5,7 @@ import (
 )
 
 
-func GetAverageBrightnessOfImage(img *image.Image, w int, h int) (uint32, uint32) {
+func GetAverageBrightnessOfImage[K *image.Paletted | image.RGBA](img *image.Paletted, w int, h int) (uint32, uint32) {
 	var average_luminosity uint32 = 0;
 	var pixels_sampled uint32 = 0;
 

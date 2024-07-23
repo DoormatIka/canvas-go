@@ -1,10 +1,13 @@
 package styles
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/gif"
+	"sort"
+
 	"sync"
 
 	"golang.org/x/image/font"
@@ -20,6 +23,7 @@ type Frame struct {
 	palettedImage *image.Paletted
 	delay int
 	disposal byte
+	index int
 }
 
 func inLoopMinimalistGif(
@@ -27,6 +31,8 @@ func inLoopMinimalistGif(
 	frameChan chan Frame,
 	src *gif.GIF,
 	font font.Face,
+	average_luminosity uint32,
+	pixels_sampled uint32,
 	i int,
 ) {
 	defer wg.Done();
@@ -38,15 +44,15 @@ func inLoopMinimalistGif(
 	delay := src.Delay[i];
 	disposal := src.Disposal[i];
 
-	dc := ComposeMinimalistFrameGif(img, font, "You're beautiful.", screenResolution);
+	dc := ComposeMinimalistFrameGif(img, font, "You're beautiful.", screenResolution, average_luminosity, pixels_sampled);
 
 	dc_img := dc.Image();
-	bounds := dc_img.Bounds();
+	// bounds := dc_img.Bounds();
 	img_palette := quantizer.Quantize(make(color.Palette, 0, 256), dc_img);
-	palettedImage := image.NewPaletted(bounds, img_palette);
-	draw.Draw(palettedImage, bounds, dc_img, bounds.Min, draw.Src);
+	palettedImage := image.NewPaletted(screenResolution, img_palette);
+	draw.Draw(palettedImage, screenResolution, dc_img, dc_img.Bounds().Min, draw.Src);
 
-	frameChan <- Frame {palettedImage, delay, disposal}
+	frameChan <- Frame {palettedImage: palettedImage, delay: delay, disposal: disposal, index: i}
 }
 
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
@@ -57,19 +63,30 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	frameChan := make(chan Frame, len(src.Image) + 1);
 	// making a goroutine frame by frame.
 	// refactor this later to avoid the creation of the goroutine being a bottleneck
-	
+
+	average_luminosity, pixels_sampled := utils.GetAverageBrightnessOfImage[*image.Paletted](src.Image[0], src.Config.Width, src.Config.Height);
 	for i := 0; i < len(src.Image); i++ {
 		wg.Add(1);
-		go inLoopMinimalistGif(&wg, frameChan, src, *font, i);
+		go inLoopMinimalistGif(&wg, frameChan, src, *font, average_luminosity, pixels_sampled, i);
 	}
 	wg.Wait();
 	close(frameChan);
 
+	frames := []Frame{};
+
+	// three loops in a row. there has to be a better way!
 	for v := range frameChan {
+		frames = append(frames, v);
+	}
+	sort.SliceStable(frames, func(i, j int) bool {
+		return frames[i].index < frames[j].index;
+	})
+	for _, v := range frames {
 		newGif.Image = append(newGif.Image, v.palettedImage);
 		newGif.Delay = append(newGif.Delay, v.delay);
 		newGif.Disposal = append(newGif.Disposal, v.disposal);
 	}
+	newGif.BackgroundIndex = src.BackgroundIndex;
 
 	return newGif;
 }
@@ -81,6 +98,8 @@ func ComposeMinimalistFrameGif(
 	font font.Face,
 	text string, 
 	resolution image.Rectangle,
+	average_luminosity uint32,
+	pixels_sampled uint32,
 ) *gg.Context {
 	screenWidth := resolution.Max.X;
 	screenHeight := resolution.Max.Y;
@@ -107,11 +126,8 @@ func ComposeMinimalistFrameGif(
 		dc.DrawImage(img, 0, 0);
 	}
 
-	dc_img := dc.Image();
-	average_luminosity, _ := utils.GetAverageBrightnessOfImage(&dc_img, screenWidth, screenHeight);
-
 	var r, g, b int;
-	if average_luminosity > 130 {
+	if average_luminosity > 100 {
 		r = 0;
 		g = 0;
 		b = 0;
@@ -121,13 +137,13 @@ func ComposeMinimalistFrameGif(
 		b = 255;
 	}
 
-	/*
 	dc.SetRGBA255(r, g, b, 200);
-	dc.SetFontFace(font);
 	dc.DrawString(fmt.Sprintf("lum: %v", average_luminosity), 0, float64(screenHeight) / 2);
 	dc.SetRGBA255(r, g, b, 200);
-	dc.SetFontFace(font);
 	dc.DrawString(fmt.Sprintf("pixels: %v", pixels_sampled), 0, float64(screenHeight) / 2 + 50);
+	/*
+	dc.SetFontFace(font);
+	dc.SetFontFace(font);
 	*/
 
 	offset := 10.0;
