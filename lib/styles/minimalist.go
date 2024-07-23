@@ -4,38 +4,69 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/gif"
 	"image/draw"
+	"image/gif"
+	"sync"
 
 	"golang.org/x/image/font"
 
 	"github.com/disintegration/gift"
-	"github.com/fogleman/gg"
 	"github.com/ericpauley/go-quantize/quantize"
+	"github.com/fogleman/gg"
 
 	"canvas/lib/utils"
 )
 
+func inLoopMinimalistGif(
+	wg *sync.WaitGroup,
+	frameChan chan struct{palettedImage *image.Paletted; delay int},
+	src *gif.GIF,
+	font *font.Face,
+	i int,
+) {
+	defer wg.Done();
+
+	quantizer := quantize.MedianCutQuantizer{};
+	img := src.Image[i];
+	delay := src.Delay[i];
+
+	dc := ComposeMinimalistFrameGif(img, *font, "You're beautiful.");
+
+	dc_img := dc.Image();
+	bounds := dc_img.Bounds();
+	img_palette := quantizer.Quantize(make(color.Palette, 0, 256), dc_img);
+	palettedImage := image.NewPaletted(bounds, img_palette);
+	draw.Draw(palettedImage, bounds, dc_img, bounds.Min, draw.Src);
+
+	frameChan <- struct{
+		palettedImage *image.Paletted; delay int
+	}{palettedImage, delay}
+}
+
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	newGif := &gif.GIF{};
-	quantizer := quantize.MedianCutQuantizer{};
 
+	var wg sync.WaitGroup;
+
+	frameChan := make(chan struct {
+		palettedImage *image.Paletted
+		delay int
+	}, len(src.Image));
+	// making a goroutine frame by frame.
+	// refactor this later to avoid the creation of the goroutine being a bottleneck
+	
 	for i := 0; i < len(src.Image); i++ {
-		img := src.Image[i]; // PalettedImage because
-							// this image was grabbed from a gif.
-		delay := src.Delay[i];
-
-		dc := ComposeMinimalistFrameGif(img, *font, "You're beautiful.");
-
-		dc_img := dc.Image();
-		bounds := dc_img.Bounds();
-		img_palette := quantizer.Quantize(make(color.Palette, 0, 256), dc_img);
-		palettedImage := image.NewPaletted(bounds, img_palette);
-		draw.Draw(palettedImage, bounds, dc_img, bounds.Min, draw.Src);
-
-		newGif.Image = append(newGif.Image, palettedImage);
-		newGif.Delay = append(newGif.Delay, delay);
+		wg.Add(1);
+		go inLoopMinimalistGif(&wg, frameChan, src, font, i);
 	}
+	wg.Wait();
+	close(frameChan);
+
+	for v := range frameChan {
+		newGif.Image = append(newGif.Image, v.palettedImage);
+		newGif.Delay = append(newGif.Delay, v.delay);
+	}
+
 	return newGif;
 }
 
