@@ -55,12 +55,12 @@ func main() {
 	if err != nil {
 		panic(err);
 	}
-	sky_gif := importGif("./images/night-sky-time-lapse.gif");
+	sky_gif := importGif("./images/Hikari_Mlem.gif")
 	g, err := gif.DecodeAll(sky_gif);
 	if err != nil {
 		panic(err);
 	}
-	f, err := os.Create("./images/res.gif");
+	f, err := os.Create("./images/res_mlem.gif");
 	if err != nil {
 		panic(err);
 	}

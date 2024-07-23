@@ -1,14 +1,13 @@
-package utils;
+package utils
 
-import "image"
+import (
+	"image"
+)
 
 
-func GetAverageBrightnessOfImage(img *image.Image) (uint32, uint32) {
+func GetAverageBrightnessOfImage(img *image.Image, w int, h int) (uint32, uint32) {
 	var average_luminosity uint32 = 0;
 	var pixels_sampled uint32 = 0;
-
-	w := (*img).Bounds().Max.X;
-	h := (*img).Bounds().Max.Y;
 
 	for x := w / 2; x < w; x += w / 8 {
 		for y := h / 4; y < h; y += y / 8 {
