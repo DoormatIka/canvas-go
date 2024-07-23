@@ -47,7 +47,6 @@ func inLoopMinimalistGif(
 	dc := ComposeMinimalistFrameGif(img, font, "You're beautiful.", screenResolution, average_luminosity, pixels_sampled);
 
 	dc_img := dc.Image();
-	// bounds := dc_img.Bounds();
 	img_palette := quantizer.Quantize(make(color.Palette, 0, 256), dc_img);
 	palettedImage := image.NewPaletted(screenResolution, img_palette);
 	draw.Draw(palettedImage, screenResolution, dc_img, dc_img.Bounds().Min, draw.Src);
@@ -127,7 +126,7 @@ func ComposeMinimalistFrameGif(
 	}
 
 	var r, g, b int;
-	if average_luminosity > 100 {
+	if average_luminosity > 150 {
 		r = 0;
 		g = 0;
 		b = 0;

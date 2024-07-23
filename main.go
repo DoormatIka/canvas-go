@@ -55,21 +55,34 @@ func main() {
 	if err != nil {
 		panic(err);
 	}
-	sky_gif := importGif("./images/okina-matara-junko.gif")
-	g, err := gif.DecodeAll(sky_gif);
+	entries, err := os.ReadDir("./images/gifs/");
 	if err != nil {
-		panic(err);
+		log.Fatal(err);
 	}
-	f, err := os.Create("./images/res_speen.gif");
-	if err != nil {
-		panic(err);
-	}
-	defer f.Close();
-	
-	defer timer("gif")();
 
-	modified_gif := styles.ModifyMinimalistGif(g, &font);
-	if err := gif.EncodeAll(f, modified_gif); err != nil {
-		panic(err);
+	defer timer("all gifs")();
+	for _, v := range entries {
+		if v.IsDir() {
+			continue;
+		}
+		info, err := v.Info();
+		if err != nil {
+			panic(err);
+		}
+		sky_gif := importGif("./images/gifs/" + info.Name())
+		g, err := gif.DecodeAll(sky_gif);
+		if err != nil {
+			panic(err);
+		}
+		f, err := os.Create("./images/gifs/minimalist/out_" + info.Name());
+		if err != nil {
+			panic(err);
+		}
+		defer f.Close();
+
+		modified_gif := styles.ModifyMinimalistGif(g, &font);
+		if err := gif.EncodeAll(f, modified_gif); err != nil {
+			panic(err);
+		}
 	}
 }
