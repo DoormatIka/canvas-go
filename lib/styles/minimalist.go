@@ -2,8 +2,6 @@ package styles
 
 import (
 	"image"
-	"image/color"
-	// "image/draw"
 	"image/gif"
 	"sort"
 
@@ -12,7 +10,6 @@ import (
 	"golang.org/x/image/font"
 
 	"github.com/disintegration/gift"
-	"github.com/ericpauley/go-quantize/quantize"
 	"github.com/fogleman/gg"
 
 	"canvas/lib/utils"
@@ -31,7 +28,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	var fontMutex sync.Mutex;
 	var wg sync.WaitGroup;
 
-	frameChan := make(chan GifFrame, len(src.Image) + 1);
+	frameChan := make(chan GifFrame, len(src.Image));
 	// making a goroutine frame by frame.
 	// refactor this later to avoid the creation of the goroutine being a bottleneck
 
@@ -42,7 +39,6 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 		go func (i int) {
 			defer wg.Done();
 
-			quantizer := quantize.MedianCutQuantizer{};
 			screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
 
 			img := src.Image[i];
@@ -53,12 +49,17 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 			dc := ComposeMinimalistFrame(img, *font, "You're amazing at what you do.", screenResolution, average_luminosity);
 			fontMutex.Unlock();
 
-			dc_img := dc.Image();
-			img_palette := quantizer.Quantize(make(color.Palette, 0, 256), dc_img);
-			palettedImage := image.NewPaletted(screenResolution, img_palette);
-			// draw.FloydSteinberg.Draw(palettedImage, screenResolution, dc_img, image.Pt(0, 0));
-			utils.GoDrawPaletted(palettedImage, screenResolution, dc_img, image.Pt(0, 0), false);
-			// draw.Draw(palettedImage, screenResolution, dc_img, image.Pt(0, 0), draw.Src);
+
+			dcImg := dc.Image();
+			// Initialize the octree with a color depth of 4
+			octree := utils.NewOctree(4) // Adjust the color depth as needed
+			utils.BuildTree(dcImg, octree)
+			// Reduce the octree to fit a 256 color palette
+			octree.Reduce()
+			// Build the palette from the reduced octree
+			octree.BuildPalette()
+			// Convert the image to a paletted image using the octree
+			palettedImage := octree.ConvertToPaletted(dcImg)
 
 			frameChan <- GifFrame {palettedImage: palettedImage, delay: delay, disposal: disposal, index: i}
 		}(i)

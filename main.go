@@ -24,41 +24,39 @@ func importGif(filename string) *bufio.Reader {
 	return r;
 }
 
-func runGif()  {
+func runGif() {
 	font, err := gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
 	if err != nil {
 		panic(err);
 	}
+	defer utils.Timer("sky gif")();
 	entries, err := os.ReadDir("./images/gifs/");
 	if err != nil {
-		log.Fatal(err);
+		panic(err);
 	}
 
-	defer utils.Timer("all gifs")();
 	for _, v := range entries {
 		if v.IsDir() {
 			continue;
 		}
-		info, err := v.Info();
-		if err != nil {
-			panic(err);
-		}
-		sky_gif := importGif("./images/gifs/" + info.Name())
+
+		sky_gif := importGif("./images/gifs/" + v.Name());
 		g, err := gif.DecodeAll(sky_gif);
 		if err != nil {
 			panic(err);
 		}
-		f, err := os.Create("./images/gifs/minimalist/out_" + info.Name());
+		f, err := os.Create("./images/gifs/minimalist/out_" + v.Name());
+		defer f.Close();
+
 		if err != nil {
 			panic(err);
 		}
-		defer f.Close();
-
 		modified_gif := styles.ModifyMinimalistGif(g, &font);
 		if err := gif.EncodeAll(f, modified_gif); err != nil {
 			panic(err);
 		}
 	}
+
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");
