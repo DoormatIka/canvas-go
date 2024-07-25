@@ -30,6 +30,20 @@ func runGif() {
 		panic(err);
 	}
 	defer utils.Timer("sky gif")();
+
+	sky_gif := importGif("./images/gifs/night-sky-time-lapse.gif");
+	g, err := gif.DecodeAll(sky_gif);
+	if err != nil {
+		panic(err);
+	}
+	f, err := os.Create("./images/gifs/minimalist/out_night-sky-time-lapse.gif");
+	defer f.Close();
+
+	modified_gif := styles.ModifyMinimalistGif(g, &font);
+	if err := gif.EncodeAll(f, modified_gif); err != nil {
+		panic(err);
+	}
+	/*
 	entries, err := os.ReadDir("./images/gifs/");
 	if err != nil {
 		panic(err);
@@ -56,7 +70,7 @@ func runGif() {
 			panic(err);
 		}
 	}
-
+	*/
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");

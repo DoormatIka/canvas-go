@@ -49,7 +49,6 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 			dc := ComposeMinimalistFrame(img, *font, "You're amazing at what you do.", screenResolution, average_luminosity);
 			fontMutex.Unlock();
 
-
 			dcImg := dc.Image();
 			// Initialize the octree with a color depth of 4
 			octree := utils.NewOctree(4) // Adjust the color depth as needed
@@ -57,7 +56,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 			// Reduce the octree to fit a 256 color palette
 			octree.Reduce()
 			// Build the palette from the reduced octree
-			octree.BuildPalette()
+			octree.BuildPalette();
 			// Convert the image to a paletted image using the octree
 			palettedImage := octree.ConvertToPaletted(dcImg)
 
@@ -101,8 +100,7 @@ func ComposeMinimalistFrame(
 	screenWidth := resolution.Max.X;
 	screenHeight := resolution.Max.Y;
 
-	dc := gg.NewContext(screenWidth, screenHeight);
-
+	var dc *gg.Context;
 	if screenHeight > 500 || screenWidth > 500 {
 		var newWidth, newHeight int 
 		// it should handle multiple image resolutions.
@@ -116,11 +114,11 @@ func ComposeMinimalistFrame(
 		resizer := gift.New( // downscaling
 			gift.Resize(newWidth, newHeight, gift.LanczosResampling),
 		)
-		dst := image.NewRGBA(resizer.Bounds(image.Rect(0, 0, screenWidth, screenHeight)))
-		resizer.Draw(dst, img)
-		dc.DrawImage(dst, 0, 0);
+		dst := image.NewRGBA(resizer.Bounds(image.Rect(0, 0, screenWidth, screenHeight)));
+		resizer.Draw(dst, img);
+		dc = gg.NewContextForImage(dst);
 	} else {
-		dc.DrawImage(img, 0, 0);
+		dc = gg.NewContextForImage(img);
 	}
 
 	var r, g, b int;

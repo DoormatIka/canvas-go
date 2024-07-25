@@ -52,7 +52,6 @@ func BuildTree(img image.Image, octree *HexadecaryTree) {
 
 func (o *HexadecaryTree) InsertColor(c color.Color) {
 	const maxDepth = 8
-	const maxColors = 256
 
 	rgba := color.RGBAModel.Convert(c).(color.RGBA)
 	r, g, b, a := rgba.R, rgba.G, rgba.B, rgba.A;
@@ -89,7 +88,7 @@ func (o *HexadecaryTree) InsertColor(c color.Color) {
 	currentNode.blueTotal += int(b)
 	currentNode.alphaTotal += int(a)
 
-	if o.leafCount > maxColors {
+	if o.leafCount > 256 {
 		o.Reduce()
 	}
 }
