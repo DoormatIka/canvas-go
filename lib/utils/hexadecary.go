@@ -38,9 +38,9 @@ func BuildTree(img image.Image, octree *HexadecaryTree) {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			// Retrieves the color of the pixel at the specified position.
-			color := img.At(x, y)
+			r, g, b, a := img.At(x, y).RGBA();
 			// Inserts the color into the octree.
-			octree.InsertColor(color)
+			octree.InsertColor(int(r), int(g), int(b), int(a));
 			// Prints the first 10 colors of the first row. (Debugging)
 			/* if y == 0 && x < 10 {
 			       fmt.Printf("Color at (0,%d): %v\n", x, color)
@@ -50,20 +50,22 @@ func BuildTree(img image.Image, octree *HexadecaryTree) {
 	}
 }
 
-func (o *HexadecaryTree) InsertColor(c color.Color) {
+func (o *HexadecaryTree) InsertColor(r int, g int, b int, a int) {
 	const maxDepth = 8
-
-	rgba := color.RGBAModel.Convert(c).(color.RGBA)
-	r, g, b, a := rgba.R, rgba.G, rgba.B, rgba.A;
+	
+	bitMask := 1 << (maxDepth - 1);
 
 	currentNode := o.root
-	bitMask := 1 << (maxDepth - 1)
+	maxDepth4 := maxDepth - 4;
+	maxDepth3 := maxDepth - 3;
+	maxDepth2 := maxDepth - 2;
+	maxDepth1 := maxDepth - 1;
 
 	for level := 0; level < o.colorDepth && level < maxDepth; level++ {
-		index := ((int(r) & bitMask) >> (maxDepth - 4 - level)) |
-			((int(g) & bitMask) >> (maxDepth - 3 - level)) |
-			((int(b) & bitMask) >> (maxDepth - 2 - level)) |
-			((int(a) & bitMask) >> (maxDepth - 1 - level))
+		index := ((r & bitMask) >> (maxDepth4 - level)) |
+			((g & bitMask) >> (maxDepth3 - level)) |
+			((b & bitMask) >> (maxDepth2 - level)) |
+			((a & bitMask) >> (maxDepth1 - level))
 
 		if currentNode.children[index] == nil {
 			currentNode.children[index] = &HexadecaryNode{}
@@ -83,10 +85,10 @@ func (o *HexadecaryTree) InsertColor(c color.Color) {
 		currentNode.isLeaf = true
 	}
 	currentNode.colorCount++
-	currentNode.redTotal += int(r)
-	currentNode.greenTotal += int(g)
-	currentNode.blueTotal += int(b)
-	currentNode.alphaTotal += int(a)
+	currentNode.redTotal += r
+	currentNode.greenTotal += g
+	currentNode.blueTotal += b
+	currentNode.alphaTotal += a
 
 	if o.leafCount > 256 {
 		o.Reduce()
