@@ -41,11 +41,6 @@ func BuildTree(img image.Image, octree *HexadecaryTree) {
 			r, g, b, a := img.At(x, y).RGBA();
 			// Inserts the color into the octree.
 			octree.InsertColor(int(r), int(g), int(b), int(a));
-			// Prints the first 10 colors of the first row. (Debugging)
-			/* if y == 0 && x < 10 {
-			       fmt.Printf("Color at (0,%d): %v\n", x, color)
-			   }
-			*/
 		}
 	}
 }
@@ -160,30 +155,22 @@ func (o *HexadecaryTree) buildPaletteRecursive(node *HexadecaryNode) {
 }
 
 func (o *HexadecaryTree) GetPaletteIndex(c color.Color) int {
-	rgba := color.RGBAModel.Convert(c).(color.RGBA)
-	r, g, b, a := rgba.R, rgba.G, rgba.B, rgba.A;
+    rgba := color.RGBAModel.Convert(c).(color.RGBA)
+    r, g, b, a := int(rgba.R), int(rgba.G), int(rgba.B), int(rgba.A)
 
-	currentNode := o.root
-	for level := 0; level < o.colorDepth; level++ {
-		index := 0
-		if r&(1<<(7-level)) != 0 {
-			index |= 0b1000
-		}
-		if g&(1<<(7-level)) != 0 {
-			index |= 0b0100
-		}
-		if b&(1<<(7-level)) != 0 {
-			index |= 0b0010
-		}
-		if a&(1<<(7-level)) != 0 {
-			index |= 0b0001
-		}
-		// insert A here somehow.
-		if currentNode.children[index] == nil {
-			break
-		}
-		currentNode = currentNode.children[index]
-	}
+    currentNode := o.root
+    for level := 0; level < o.colorDepth; level++ {
+        shift := 7 - level
+        index := ((r >> shift) & 1) << 3 |
+            ((g >> shift) & 1) << 2 |
+            ((b >> shift) & 1) << 1 |
+            ((a >> shift) & 1)
+
+        if currentNode.children[index] == nil {
+            break
+        }
+        currentNode = currentNode.children[index]
+    }
 
 	if currentNode.isLeaf {
 		return currentNode.paletteIndex

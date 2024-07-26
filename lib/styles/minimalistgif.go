@@ -25,14 +25,14 @@ type GifFrame struct {
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	newGif := &gif.GIF{};
 
-	var fontMutex sync.Mutex;
+	fontMutex := sync.Mutex{};
 	var wg sync.WaitGroup;
 
 	frameChan := make(chan GifFrame, len(src.Image));
 	// making a goroutine frame by frame.
 	// refactor this later to avoid the creation of the goroutine being a bottleneck
 
-	average_luminosity, _ := utils.GetAverageBrightnessOfImage[*image.Paletted](src.Image[0], src.Config.Width, src.Config.Height);
+	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
 	for i := 0; i < len(src.Image); i++ {
 		wg.Add(1);
 
@@ -45,17 +45,16 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 			delay := src.Delay[i];
 			disposal := src.Disposal[i];
 
-			fontMutex.Lock();
-			dc := ComposeMinimalistFrame(img, *font, "You're amazing at what you do.", screenResolution, average_luminosity);
-			fontMutex.Unlock();
+			fontMutex.Lock()
+			dc := ComposeMinimalistFrameGif(img, *font, "You're amazing at what you do.", screenResolution, average_luminosity);
+			fontMutex.Unlock()
 
 			dcImg := dc.Image();
 			// Initialize the octree with a color depth of 4
 			octree := utils.NewOctree(4) // Adjust the color depth as needed
 			utils.BuildTree(dcImg, octree)
-			// Reduce the octree to fit a 256 color palette
-			octree.Reduce()
-			// Build the palette from the reduced octree
+			octree.Reduce();
+			// Build the palette from the reduced octree (reduces from image automatically)
 			octree.BuildPalette();
 			// Convert the image to a paletted image using the octree
 			palettedImage := octree.ConvertToPaletted(dcImg)
@@ -89,8 +88,9 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	return newGif;
 }
 
+
 // this automatically adapts to the image resolutions
-func ComposeMinimalistFrame(
+func ComposeMinimalistFrameGif(
 	img *image.Paletted,
 	font font.Face,
 	text string, 

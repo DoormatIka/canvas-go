@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"runtime/pprof"
+	"runtime/trace"
 
 	"canvas/lib/styles"
 	"canvas/lib/utils"
@@ -74,6 +75,7 @@ func runGif() {
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");
+var memorytrace = flag.String("memorytrace", "", "write memory trace to file");
 func main() {
 	flag.Parse();
 	if *cpuprofile != "" {
@@ -83,6 +85,14 @@ func main() {
 		}
 		pprof.StartCPUProfile(f);
 		defer pprof.StopCPUProfile();
+	}
+	if *memorytrace != "" {
+		f, err := os.Create(*memorytrace);
+		if err != nil {
+			log.Fatal(err);
+		}
+		trace.Start(f);
+		defer trace.Stop();
 	}
 
 	runGif();
