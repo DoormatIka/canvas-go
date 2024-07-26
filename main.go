@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
-
+	"image"
 	"image/gif"
 	"log"
 	"os"
@@ -16,62 +16,47 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func importGif(filename string) *bufio.Reader {
-	inputFile, err := os.Open(filename);
-	if err != nil {
-		panic(err);
-	}
-	r := bufio.NewReader(inputFile);
-	return r;
-}
-
-func runGif() {
+func runGifForMinimalist() {
 	font, err := gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
 	if err != nil {
 		panic(err);
 	}
 	defer utils.Timer("sky gif")();
 
-	sky_gif := importGif("./images/gifs/night-sky-time-lapse.gif");
+	sky_gif_file, err := os.Open("./images/night-sky-time-lapse.gif");
+	if err != nil {
+		panic(err);
+	}
+	sky_gif := bufio.NewReader(sky_gif_file);
+
 	g, err := gif.DecodeAll(sky_gif);
 	if err != nil {
 		panic(err);
 	}
-	f, err := os.Create("./images/gifs/minimalist/out_night-sky-time-lapse.gif");
+	f, err := os.Create("./images/minimalist/gifs/out_night-sky-time-lapse.gif");
 	defer f.Close();
 
-	modified_gif := styles.ModifyMinimalistGif(g, &font);
+	modified_gif := styles.ModifyMinimalistGif(g, &font, "The sky looks nice doesn't it?");
 	if err := gif.EncodeAll(f, modified_gif); err != nil {
 		panic(err);
 	}
-	/*
-	entries, err := os.ReadDir("./images/gifs/");
+}
+
+func runImageForQuote() {
+	font, err := gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
 	if err != nil {
 		panic(err);
 	}
+	defer utils.Timer("sky gif")();
 
-	for _, v := range entries {
-		if v.IsDir() {
-			continue;
-		}
-
-		sky_gif := importGif("./images/gifs/" + v.Name());
-		g, err := gif.DecodeAll(sky_gif);
-		if err != nil {
-			panic(err);
-		}
-		f, err := os.Create("./images/gifs/minimalist/out_" + v.Name());
-		defer f.Close();
-
-		if err != nil {
-			panic(err);
-		}
-		modified_gif := styles.ModifyMinimalistGif(g, &font);
-		if err := gif.EncodeAll(f, modified_gif); err != nil {
-			panic(err);
-		}
+	image_file, err := os.Open("./images/Moon.png");
+	if err != nil {
+		panic(err);
 	}
-	*/
+	im := bufio.NewReader(image_file);
+	decoded_im, _, err := image.Decode(im);
+	quote_img := styles.ModifyQuoteImage(decoded_im, &font);
+	quote_img.SavePNG("./images/quote/out_Moon.png");
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");
@@ -95,5 +80,6 @@ func main() {
 		defer trace.Stop();
 	}
 
-	runGif();
+	// runImageForQuote();
+	runGifForMinimalist();
 }

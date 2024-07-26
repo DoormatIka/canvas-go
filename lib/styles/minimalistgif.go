@@ -22,7 +22,7 @@ type GifFrame struct {
 	index int
 }
 
-func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
+func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
 
 	fontMutex := sync.Mutex{};
@@ -46,18 +46,18 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 			disposal := src.Disposal[i];
 
 			fontMutex.Lock()
-			dc := ComposeMinimalistFrameGif(img, *font, "You're amazing at what you do.", screenResolution, average_luminosity);
+			dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
 			fontMutex.Unlock()
 
 			dcImg := dc.Image();
 			// Initialize the octree with a color depth of 4
-			octree := utils.NewOctree(4) // Adjust the color depth as needed
-			utils.BuildTree(dcImg, octree)
-			octree.Reduce();
-			// Build the palette from the reduced octree (reduces from image automatically)
-			octree.BuildPalette();
-			// Convert the image to a paletted image using the octree
-			palettedImage := octree.ConvertToPaletted(dcImg)
+			hexatree := utils.NewHexaTree(4) // Adjust the color depth as needed
+			utils.BuildTree(dcImg, hexatree);
+			hexatree.Reduce();
+			// Build the palette from the reduced hexatree (reduces from image automatically)
+			hexatree.BuildPalette();
+			// Convert the image to a paletted image using the hexatree
+			palettedImage := hexatree.ConvertToPaletted(dcImg)
 
 			frameChan <- GifFrame {palettedImage: palettedImage, delay: delay, disposal: disposal, index: i}
 		}(i)
@@ -88,7 +88,6 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face) *gif.GIF {
 	return newGif;
 }
 
-
 // this automatically adapts to the image resolutions
 func ComposeMinimalistFrameGif(
 	img *image.Paletted,
@@ -116,9 +115,11 @@ func ComposeMinimalistFrameGif(
 		)
 		dst := image.NewRGBA(resizer.Bounds(image.Rect(0, 0, screenWidth, screenHeight)));
 		resizer.Draw(dst, img);
-		dc = gg.NewContextForImage(dst);
+		dc = gg.NewContext(screenWidth, screenHeight);
+		dc.DrawImage(dst, 0, 0); // significantly slower.
 	} else {
-		dc = gg.NewContextForImage(img);
+		dc = gg.NewContext(screenWidth, screenHeight);
+		dc.DrawImage(img, 0, 0); // significantly slower.
 	}
 
 	var r, g, b int;

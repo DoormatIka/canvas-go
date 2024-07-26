@@ -24,7 +24,7 @@ type HexadecaryTree struct {
 	palette    []color.Color
 }
 
-func NewOctree(colorDepth int) *HexadecaryTree {
+func NewHexaTree(colorDepth int) *HexadecaryTree {
 	return &HexadecaryTree{
 		root:       &HexadecaryNode{},
 		colorDepth: colorDepth,
@@ -32,62 +32,59 @@ func NewOctree(colorDepth int) *HexadecaryTree {
 }
 
 func BuildTree(img image.Image, octree *HexadecaryTree) {
-	// Retrieves the bounds of an image in order to determine the range of pixels to iterate over.
-	bounds := img.Bounds()
-	// Iterates over each pixel within the bounds.
-	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-		for x := bounds.Min.X; x < bounds.Max.X; x++ {
-			// Retrieves the color of the pixel at the specified position.
-			r, g, b, a := img.At(x, y).RGBA();
-			// Inserts the color into the octree.
-			octree.InsertColor(int(r), int(g), int(b), int(a));
-		}
-	}
+    bounds := img.Bounds()
+    minX, minY, maxX, maxY := bounds.Min.X, bounds.Min.Y, bounds.Max.X, bounds.Max.Y
+
+    for y := minY; y < maxY; y++ {
+        for x := minX; x < maxX; x++ {
+			// this loop would be significantly faster.
+            color := img.At(x, y)
+            octree.InsertColor(color)
+        }
+    }
 }
 
-func (o *HexadecaryTree) InsertColor(r int, g int, b int, a int) {
-	const maxDepth = 8
-	
-	bitMask := 1 << (maxDepth - 1);
+func (o *HexadecaryTree) InsertColor(c color.Color) {
+    const maxDepth = 8
+    const maxColors = 256
 
-	currentNode := o.root
-	maxDepth4 := maxDepth - 4;
-	maxDepth3 := maxDepth - 3;
-	maxDepth2 := maxDepth - 2;
-	maxDepth1 := maxDepth - 1;
+    rgba := color.RGBAModel.Convert(c).(color.RGBA)
+    r, g, b, a := int(rgba.R), int(rgba.G), int(rgba.B), int(rgba.A)
 
-	for level := 0; level < o.colorDepth && level < maxDepth; level++ {
-		index := ((r & bitMask) >> (maxDepth4 - level)) |
-			((g & bitMask) >> (maxDepth3 - level)) |
-			((b & bitMask) >> (maxDepth2 - level)) |
-			((a & bitMask) >> (maxDepth1 - level))
+    currentNode := o.root
 
-		if currentNode.children[index] == nil {
-			currentNode.children[index] = &HexadecaryNode{}
-			if level < maxDepth-1 {
-				o.reducible[level+1] = currentNode.children[index]
-			}
-			if level == maxDepth-1 {
-				o.leafCount++
-			}
-		}
+    for level := 0; level < o.colorDepth && level < maxDepth; level++ {
+        shift := maxDepth - 1 - level
+        index := ((r >> shift) & 1) << 3 |
+            ((g >> shift) & 1) << 2 |
+            ((b >> shift) & 1) << 1 |
+            ((a >> shift) & 1)
 
-		currentNode = currentNode.children[index]
-		bitMask >>= 1
-	}
+        if currentNode.children[index] == nil {
+            currentNode.children[index] = &HexadecaryNode{}
+            if level < maxDepth-1 {
+                o.reducible[level+1] = currentNode.children[index]
+            }
+            if level == maxDepth-1 {
+                o.leafCount++
+            }
+        }
 
-	if !currentNode.isLeaf {
-		currentNode.isLeaf = true
-	}
-	currentNode.colorCount++
-	currentNode.redTotal += r
-	currentNode.greenTotal += g
-	currentNode.blueTotal += b
-	currentNode.alphaTotal += a
+        currentNode = currentNode.children[index]
+    }
 
-	if o.leafCount > 256 {
-		o.Reduce()
-	}
+    if !currentNode.isLeaf {
+        currentNode.isLeaf = true
+    }
+    currentNode.colorCount++
+    currentNode.redTotal += r
+    currentNode.greenTotal += g
+    currentNode.blueTotal += b
+    currentNode.alphaTotal += a
+
+    if o.leafCount > maxColors {
+        o.Reduce()
+    }
 }
 
 func (o *HexadecaryTree) Reduce() {
@@ -172,11 +169,11 @@ func (o *HexadecaryTree) GetPaletteIndex(c color.Color) int {
         currentNode = currentNode.children[index]
     }
 
-	if currentNode.isLeaf {
-		return currentNode.paletteIndex
-	}
+    if currentNode.isLeaf {
+        return currentNode.paletteIndex
+    }
 
-	return 0
+    return 0
 }
 
 func (o *HexadecaryTree) ConvertToPaletted(img image.Image) *image.Paletted {
