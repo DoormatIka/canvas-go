@@ -4,12 +4,11 @@ import (
 	"image"
 	"image/gif"
 	"sort"
-
 	"sync"
+
 
 	"golang.org/x/image/font"
 
-	"github.com/disintegration/gift"
 	"github.com/fogleman/gg"
 
 	"canvas/lib/utils"
@@ -36,10 +35,9 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	for i := 0; i < len(src.Image); i++ {
 		wg.Add(1);
 
+		screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
 		go func (i int) {
 			defer wg.Done();
-
-			screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
 
 			img := src.Image[i];
 			delay := src.Delay[i];
@@ -51,7 +49,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 
 			dcImg := dc.Image();
 			// Initialize the octree with a color depth of 4
-			hexatree := utils.NewHexaTree(4) // Adjust the color depth as needed
+			hexatree := utils.NewHexaTree(8) // Adjust the color depth as needed
 			utils.BuildTree(dcImg, hexatree);
 			hexatree.Reduce();
 			// Build the palette from the reduced hexatree (reduces from image automatically)
@@ -96,30 +94,20 @@ func ComposeMinimalistFrameGif(
 	resolution image.Rectangle,
 	average_luminosity uint32,
 ) *gg.Context {
-	screenWidth := resolution.Max.X;
-	screenHeight := resolution.Max.Y;
+	gifWidth := resolution.Max.X;
+	gifHeight := resolution.Max.Y;
+
+	imgXOrigin := img.Bounds().Min.X;
+	imgYOrigin := img.Bounds().Min.Y;
+	imgWidth := img.Bounds().Max.X;
+	imgHeight := img.Bounds().Max.Y;
 
 	var dc *gg.Context;
-	if screenHeight > 500 || screenWidth > 500 {
-		var newWidth, newHeight int 
-		// it should handle multiple image resolutions.
-		if screenHeight > screenWidth {
-			newHeight = 0
-			newWidth = screenWidth
-		} else {
-			newHeight = screenHeight
-			newWidth = 0
-		}
-		resizer := gift.New( // downscaling
-			gift.Resize(newWidth, newHeight, gift.LanczosResampling),
-		)
-		dst := image.NewRGBA(resizer.Bounds(image.Rect(0, 0, screenWidth, screenHeight)));
-		resizer.Draw(dst, img);
-		dc = gg.NewContext(screenWidth, screenHeight);
-		dc.DrawImage(dst, 0, 0); // significantly slower.
-	} else {
-		dc = gg.NewContext(screenWidth, screenHeight);
+	if 0 != imgXOrigin || 0 != imgYOrigin || imgWidth != gifWidth || imgHeight != gifHeight {
+		dc = gg.NewContext(gifWidth, gifHeight);
 		dc.DrawImage(img, 0, 0); // significantly slower.
+	} else {
+		dc = gg.NewContextForImage(img);
 	}
 
 	var r, g, b int;
@@ -137,7 +125,7 @@ func ComposeMinimalistFrameGif(
 
 	offset := 10.0;
 	dc.SetRGBA255(r, g, b, 255);
-	dc.DrawRectangle(0 + offset, 0 + offset, float64(screenWidth) - (10 + offset), float64(screenHeight) - (10 + offset));
+	dc.DrawRectangle(0 + offset, 0 + offset, float64(gifWidth) - (10 + offset), float64(gifHeight) - (10 + offset));
 	dc.SetLineWidth(1);
 	dc.Stroke();
 

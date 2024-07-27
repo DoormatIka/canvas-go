@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"flag"
+	"fmt"
 	"image"
 	"image/gif"
 	"log"
@@ -16,14 +17,14 @@ import (
 	"github.com/fogleman/gg"
 )
 
-func runGifForMinimalist() {
+func runGifForMinimalist(filename string) {
 	font, err := gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
 	if err != nil {
 		panic(err);
 	}
-	defer utils.Timer("sky gif")();
+	defer utils.Timer(filename)();
 
-	sky_gif_file, err := os.Open("./images/night-sky-time-lapse.gif");
+	sky_gif_file, err := os.Open("./images/" + filename);
 	if err != nil {
 		panic(err);
 	}
@@ -33,9 +34,10 @@ func runGifForMinimalist() {
 	if err != nil {
 		panic(err);
 	}
-	f, err := os.Create("./images/minimalist/gifs/out_night-sky-time-lapse.gif");
+	f, err := os.Create("./images/minimalist/gifs/out_" + filename);
 	defer f.Close();
 
+	fmt.Printf("Number of frames: %v\n", len(g.Image));
 	modified_gif := styles.ModifyMinimalistGif(g, &font, "The sky looks nice doesn't it?");
 	if err := gif.EncodeAll(f, modified_gif); err != nil {
 		panic(err);
@@ -81,5 +83,5 @@ func main() {
 	}
 
 	// runImageForQuote();
-	runGifForMinimalist();
+	runGifForMinimalist("anime-dance.gif");
 }
