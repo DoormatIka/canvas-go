@@ -8,6 +8,7 @@ import (
 	"image/gif"
 	"log"
 	"os"
+	"regexp"
 	"runtime/pprof"
 	"runtime/trace"
 
@@ -83,5 +84,19 @@ func main() {
 	}
 
 	// runImageForQuote();
-	runGifForMinimalist("anime-dance.gif");
+	files, err := os.ReadDir("./images/");
+	if err != nil {
+		log.Fatal(err);
+	}
+	reg := regexp.MustCompile(".*\\.gif");
+	for _, file := range files {
+		if file.IsDir() {
+			continue;
+		}
+		if reg.Match([]byte(file.Name())) {
+			runGifForMinimalist(file.Name());
+		}
+		println();
+	}
+	// utils.RunOctQuant();
 }

@@ -2,10 +2,10 @@ package styles
 
 import (
 	"image"
+	"image/color"
 	"image/gif"
 	"sort"
 	"sync"
-
 
 	"golang.org/x/image/font"
 
@@ -48,14 +48,11 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 			fontMutex.Unlock()
 
 			dcImg := dc.Image();
-			// Initialize the octree with a color depth of 4
-			hexatree := utils.NewHexaTree(8) // Adjust the color depth as needed
-			utils.BuildTree(dcImg, hexatree);
-			hexatree.Reduce();
-			// Build the palette from the reduced hexatree (reduces from image automatically)
-			hexatree.BuildPalette();
-			// Convert the image to a paletted image using the hexatree
-			palettedImage := hexatree.ConvertToPaletted(dcImg)
+			colorCount := 256;
+			quantizer := utils.NewOctreeQuantizer();
+			addColorsFromImage(&dcImg, quantizer);
+			palette := quantizer.MakePalette(colorCount);
+			palettedImage := applyPaletteToImage(&dcImg, quantizer, palette);
 
 			frameChan <- GifFrame {palettedImage: palettedImage, delay: delay, disposal: disposal, index: i}
 		}(i)
@@ -84,6 +81,53 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif.BackgroundIndex = src.BackgroundIndex;
 
 	return newGif;
+}
+
+func applyPaletteToImage(img *image.Image, quantizer *utils.OctreeQuantizer, palette []color.RGBA) *image.Paletted {
+    // Create a new image with the quantized colors
+	bounds := (*img).Bounds();
+	p := make(color.Palette, len(palette))
+    for i, c := range palette {
+        p[i] = c
+    }
+    quantizedImg := image.NewPaletted(bounds, p); // this will error.
+    for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+        for x := bounds.Min.X; x < bounds.Max.X; x++ {
+            r, g, b, a := (*img).At(x, y).RGBA()
+            color_palette := color.RGBA{
+                R: uint8(r >> 8),
+                G: uint8(g >> 8),
+                B: uint8(b >> 8),
+				A: uint8(a >> 8),
+            }
+            paletteIndex := quantizer.GetPaletteIndex(color_palette)
+            quantizedColor := palette[paletteIndex]
+            quantizedImg.Set(x, y, color.RGBA{
+                R: uint8(quantizedColor.R),
+                G: uint8(quantizedColor.G),
+                B: uint8(quantizedColor.B),
+                A: uint8(quantizedColor.A),
+            })
+        }
+    }
+	return quantizedImg;
+}
+
+func addColorsFromImage(img *image.Image, quantizer *utils.OctreeQuantizer) {
+    // Add colors from the image to the quantizer
+    bounds := (*img).Bounds()
+    for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+        for x := bounds.Min.X; x < bounds.Max.X; x++ {
+            r, g, b, a := (*img).At(x, y).RGBA()
+            color := color.RGBA{
+                R: uint8(r >> 8),
+                G: uint8(g >> 8),
+                B: uint8(b >> 8),
+				A: uint8(a >> 8),
+            }
+            quantizer.AddColor(color)
+        }
+    }
 }
 
 // this automatically adapts to the image resolutions
