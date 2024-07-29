@@ -26,6 +26,7 @@ func runGifForMinimalist(filename string) {
 	defer utils.Timer(filename)();
 
 	sky_gif_file, err := os.Open("./images/" + filename);
+	println(sky_gif_file.Name());
 	if err != nil {
 		panic(err);
 	}

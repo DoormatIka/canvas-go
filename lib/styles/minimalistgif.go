@@ -3,8 +3,8 @@ package styles
 import (
 	"image"
 	"image/color"
+	"image/draw"
 	"image/gif"
-	"sort"
 	"sync"
 
 	"golang.org/x/image/font"
@@ -25,54 +25,68 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
 
 	fontMutex := sync.Mutex{};
-	var wg sync.WaitGroup;
 
-	frameChan := make(chan GifFrame, len(src.Image));
-	// making a goroutine frame by frame.
-	// refactor this later to avoid the creation of the goroutine being a bottleneck
+    // Initialize the octree quantizer
+    quantizer := utils.NewOctreeQuantizer()
+    // Add colors from each frame to the quantizer
+	utils.AddColorsToQuantizer(quantizer, src);
+    // Generate the palette
+    colorCount := 64
+    palette := quantizer.MakePalette(colorCount)
+    // Convert []Color to color.Palette
+    colorPalette := utils.ConvertToColorPalette(palette)
+    // Add a transparent color to the end of the palette
+    colorPalette = append(colorPalette, color.RGBA{0, 0, 0, 0})
+    // Create a new GIF with quantized frames
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
+	// making a goroutine frame by frame.
+	// refactor this later to avoid the creation of the goroutine being a bottleneck
 	for i := 0; i < len(src.Image); i++ {
-		wg.Add(1);
-
 		screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
-		go func (i int) {
-			defer wg.Done();
 
-			img := src.Image[i];
-			delay := src.Delay[i];
-			disposal := src.Disposal[i];
+		img := src.Image[i];
+		delay := src.Delay[i];
+		disposal := src.Disposal[i];
 
-			fontMutex.Lock()
-			dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
-			fontMutex.Unlock()
+		fontMutex.Lock()
+		dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
+		fontMutex.Unlock()
 
-			dcImg := dc.Image();
-			colorCount := 256;
-			quantizer := utils.NewOctreeQuantizer();
-			addColorsFromImage(&dcImg, quantizer);
-			palette := quantizer.MakePalette(colorCount);
-			palettedImage := applyPaletteToImage(&dcImg, quantizer, palette);
+		dcImg := dc.Image();
+		bounds := dcImg.Bounds();
+		quantizedFrame := image.NewPaletted(bounds, colorPalette);
+		transparentIndex := len(colorPalette) - 1;
 
-			frameChan <- GifFrame {palettedImage: palettedImage, delay: delay, disposal: disposal, index: i}
-		}(i)
-	}
-	wg.Wait();
-	close(frameChan);
+		if i > 0 {
+			switch src.Disposal[i-1] {
+            case gif.DisposalPrevious:
+                draw.Draw(quantizedFrame, bounds, newGif.Image[i-1], image.Point{}, draw.Over)
+            case gif.DisposalBackground:
+				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+                    for x := bounds.Min.X; x < bounds.Max.X; x++ {
+                        quantizedFrame.SetColorIndex(x, y, uint8(transparentIndex))
+                    }
+                }
+			}
+		}
 
-	frames := []GifFrame{};
+		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+			for x := bounds.Min.X; x < bounds.Max.X; x++ {
+				r, g, b, a := dcImg.At(x, y).RGBA()
+				color := utils.NewColor(int(r>>8), int(g>>8), int(b>>8), int(a>>8))
+				if a == 0 {
+					quantizedFrame.SetColorIndex(x, y, uint8(transparentIndex))
+				} else {
+					index := quantizer.GetPaletteIndex(color)
+					quantizedFrame.SetColorIndex(x, y, uint8(index))
+				}
+			}
+		}
 
-	// three loops in a row. there has to be a better way!
-	for v := range frameChan {
-		frames = append(frames, v);
-	}
-	sort.SliceStable(frames, func(i, j int) bool {
-		return frames[i].index < frames[j].index;
-	})
-	for _, v := range frames {
-		newGif.Image = append(newGif.Image, v.palettedImage);
-		newGif.Delay = append(newGif.Delay, v.delay);
-		newGif.Disposal = append(newGif.Disposal, v.disposal);
+		newGif.Image = append(newGif.Image, quantizedFrame);
+		newGif.Delay = append(newGif.Delay, delay);
+		newGif.Disposal = append(newGif.Disposal, disposal);
 	}
 	newGif.LoopCount = src.LoopCount;
 	newGif.Config.Height = src.Config.Height;
@@ -81,53 +95,6 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif.BackgroundIndex = src.BackgroundIndex;
 
 	return newGif;
-}
-
-func applyPaletteToImage(img *image.Image, quantizer *utils.OctreeQuantizer, palette []color.RGBA) *image.Paletted {
-    // Create a new image with the quantized colors
-	bounds := (*img).Bounds();
-	p := make(color.Palette, len(palette))
-    for i, c := range palette {
-        p[i] = c
-    }
-    quantizedImg := image.NewPaletted(bounds, p); // this will error.
-    for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-        for x := bounds.Min.X; x < bounds.Max.X; x++ {
-            r, g, b, a := (*img).At(x, y).RGBA()
-            color_palette := color.RGBA{
-                R: uint8(r >> 8),
-                G: uint8(g >> 8),
-                B: uint8(b >> 8),
-				A: uint8(a >> 8),
-            }
-            paletteIndex := quantizer.GetPaletteIndex(color_palette)
-            quantizedColor := palette[paletteIndex]
-            quantizedImg.Set(x, y, color.RGBA{
-                R: uint8(quantizedColor.R),
-                G: uint8(quantizedColor.G),
-                B: uint8(quantizedColor.B),
-                A: uint8(quantizedColor.A),
-            })
-        }
-    }
-	return quantizedImg;
-}
-
-func addColorsFromImage(img *image.Image, quantizer *utils.OctreeQuantizer) {
-    // Add colors from the image to the quantizer
-    bounds := (*img).Bounds()
-    for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-        for x := bounds.Min.X; x < bounds.Max.X; x++ {
-            r, g, b, a := (*img).At(x, y).RGBA()
-            color := color.RGBA{
-                R: uint8(r >> 8),
-                G: uint8(g >> 8),
-                B: uint8(b >> 8),
-				A: uint8(a >> 8),
-            }
-            quantizer.AddColor(color)
-        }
-    }
 }
 
 // this automatically adapts to the image resolutions

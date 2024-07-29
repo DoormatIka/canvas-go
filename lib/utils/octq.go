@@ -2,10 +2,15 @@ package utils
 
 import (
 	"image/color"
+	"image/gif"
 )
 
+type Color struct {
+    Red, Green, Blue, Alpha int
+}
+
 type OctreeNode struct {
-    Color        color.RGBA
+    Color        Color
     PixelCount   int
     PaletteIndex int
     Children     [8]*OctreeNode
@@ -18,13 +23,13 @@ type OctreeQuantizer struct {
     Root   *OctreeNode
 }
 
-func NewColor(red, green, blue, alpha uint8) color.RGBA {
-    return color.RGBA{R: red, G: green, B: blue, A: alpha}
+func NewColor(red, green, blue, alpha int) Color {
+    return Color{Red: red, Green: green, Blue: blue, Alpha: alpha}
 }
 
 func NewOctreeNode(level int, parent *OctreeQuantizer) *OctreeNode {
     node := &OctreeNode{
-        Color: color.RGBA{0, 0, 0, 0},
+        Color: Color{0, 0, 0, 0},
     }
     if level < MaxDepth-1 {
         parent.AddLevelNode(level, node)
@@ -60,12 +65,12 @@ func (node *OctreeNode) GetNodesPixelCount() int {
     return sumCount
 }
 
-func (node *OctreeNode) AddColor(color color.RGBA, level int, parent *OctreeQuantizer) {
+func (node *OctreeNode) AddColor(color Color, level int, parent *OctreeQuantizer) {
     if level >= MaxDepth {
-        node.Color.R += color.R
-        node.Color.G += color.G
-        node.Color.B += color.B
-		node.Color.A += color.A
+        node.Color.Red += color.Red
+        node.Color.Green += color.Green
+        node.Color.Blue += color.Blue
+        node.Color.Alpha += color.Alpha
         node.PixelCount++
         return
     }
@@ -76,7 +81,7 @@ func (node *OctreeNode) AddColor(color color.RGBA, level int, parent *OctreeQuan
     node.Children[index].AddColor(color, level+1, parent)
 }
 
-func (node *OctreeNode) GetPaletteIndex(color color.RGBA, level int) int {
+func (node *OctreeNode) GetPaletteIndex(color Color, level int) int {
     if node.IsLeaf() {
         return node.PaletteIndex
     }
@@ -96,10 +101,10 @@ func (node *OctreeNode) RemoveLeaves() int {
     result := 0
     for i := range node.Children {
         if node.Children[i] != nil {
-            node.Color.R += node.Children[i].Color.R
-            node.Color.G += node.Children[i].Color.G
-            node.Color.B += node.Children[i].Color.B
-			node.Color.A += node.Children[i].Color.A
+            node.Color.Red += node.Children[i].Color.Red
+            node.Color.Green += node.Children[i].Color.Green
+            node.Color.Blue += node.Children[i].Color.Blue
+            node.Color.Alpha += node.Children[i].Color.Alpha
             node.PixelCount += node.Children[i].PixelCount
             result++
         }
@@ -107,30 +112,30 @@ func (node *OctreeNode) RemoveLeaves() int {
     return result - 1
 }
 
-func (node *OctreeNode) GetColorIndexForLevel(color color.RGBA, level int) int {
+func (node *OctreeNode) GetColorIndexForLevel(color Color, level int) int {
     index := 0
     mask := 0x80 >> level
-    if int(color.R)&mask != 0 {
+    if color.Red&mask != 0 {
         index |= 4
     }
-    if int(color.G)&mask != 0 {
+    if color.Green&mask != 0 {
         index |= 2
     }
-    if int(color.B)&mask != 0 {
+    if color.Blue&mask != 0 {
         index |= 1
     }
     return index
 }
 
-func (node *OctreeNode) GetColor() color.RGBA {
+func (node *OctreeNode) GetColor() Color {
     if node.PixelCount == 0 {
-        return color.RGBA{0, 0, 0, 0}
+        return Color{0, 0, 0, 0}
     }
-    return color.RGBA{
-        R: uint8(int(node.Color.R) / node.PixelCount),
-        G: uint8(int(node.Color.G) / node.PixelCount),
-        B: uint8(int(node.Color.B) / node.PixelCount),
-		A: uint8(int(node.Color.A) / node.PixelCount),
+    return Color{
+        Red:   node.Color.Red / node.PixelCount,
+        Green: node.Color.Green / node.PixelCount,
+        Blue:  node.Color.Blue / node.PixelCount,
+        Alpha: node.Color.Alpha / node.PixelCount,
     }
 }
 
@@ -150,12 +155,12 @@ func (quantizer *OctreeQuantizer) AddLevelNode(level int, node *OctreeNode) {
     quantizer.Levels[level] = append(quantizer.Levels[level], node)
 }
 
-func (quantizer *OctreeQuantizer) AddColor(color color.RGBA) {
+func (quantizer *OctreeQuantizer) AddColor(color Color) {
     quantizer.Root.AddColor(color, 0, quantizer)
 }
 
-func (quantizer *OctreeQuantizer) MakePalette(colorCount int) []color.RGBA {
-    var palette []color.RGBA
+func (quantizer *OctreeQuantizer) MakePalette(colorCount int) []Color {
+    var palette []Color
     paletteIndex := 0
     leafCount := len(quantizer.GetLeaves())
     for level := MaxDepth - 1; level >= 0; level-- {
@@ -185,7 +190,34 @@ func (quantizer *OctreeQuantizer) MakePalette(colorCount int) []color.RGBA {
     return palette
 }
 
-func (quantizer *OctreeQuantizer) GetPaletteIndex(color color.RGBA) int {
+func (quantizer *OctreeQuantizer) GetPaletteIndex(color Color) int {
     return quantizer.Root.GetPaletteIndex(color, 0)
+}
+
+func ConvertToColorPalette(palette []Color) color.Palette {
+    var colorPalette color.Palette
+    for _, c := range palette {
+        colorPalette = append(colorPalette, color.RGBA{
+            R: uint8(c.Red),
+            G: uint8(c.Green),
+            B: uint8(c.Blue),
+            A: uint8(c.Alpha),
+        })
+    }
+    return colorPalette
+}
+
+func AddColorsToQuantizer(q *OctreeQuantizer, g *gif.GIF) {
+    // Add colors from each frame to the quantizer
+    for _, frame := range g.Image {
+        bounds := frame.Bounds()
+        for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+            for x := bounds.Min.X; x < bounds.Max.X; x++ {
+                r, g, b, a := frame.At(x, y).RGBA()
+                color := NewColor(int(r>>8), int(g>>8), int(b>>8), int(a>>8))
+                q.AddColor(color)
+            }
+        }
+    }
 }
 
