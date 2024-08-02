@@ -2,10 +2,7 @@ package styles
 
 import (
 	"image"
-	"image/color"
-	"image/draw"
 	"image/gif"
-	"sync"
 
 	"golang.org/x/image/font"
 
@@ -17,77 +14,72 @@ import (
 type GifFrame struct {
 	palettedImage *image.Paletted
 	delay int
-	disposal byte
 	index int
 }
 
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
 
-	fontMutex := sync.Mutex{};
-
-    // Initialize the octree quantizer
     quantizer := utils.NewOctreeQuantizer()
-    // Add colors from each frame to the quantizer
 	utils.AddColorsToQuantizer(quantizer, src);
-    // Generate the palette
-    colorCount := 64
-    palette := quantizer.MakePalette(colorCount)
-    // Convert []Color to color.Palette
-    colorPalette := utils.ConvertToColorPalette(palette)
-    // Add a transparent color to the end of the palette
-    colorPalette = append(colorPalette, color.RGBA{0, 0, 0, 0})
-    // Create a new GIF with quantized frames
+    colorCount := 256;
+	palette := quantizer.MakePalette(colorCount)
+	colorPalette := utils.ConvertToColorPalette(palette);
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
-	// making a goroutine frame by frame.
-	// refactor this later to avoid the creation of the goroutine being a bottleneck
-	for i := 0; i < len(src.Image); i++ {
-		screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
+	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
 
+	// the reused image.
+	reusedImage := image.NewPaletted(screenResolution, colorPalette);
+
+	for i := 0; i < len(src.Image); i++ {
 		img := src.Image[i];
 		delay := src.Delay[i];
 		disposal := src.Disposal[i];
 
-		fontMutex.Lock()
+		regularImage := image.NewPaletted(screenResolution, colorPalette);
+
 		dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
-		fontMutex.Unlock()
-
-		dcImg := dc.Image();
+		dcImg := dc.Image().(*image.RGBA);
 		bounds := dcImg.Bounds();
-		quantizedFrame := image.NewPaletted(bounds, colorPalette);
-		transparentIndex := len(colorPalette) - 1;
-
-		if i > 0 {
-			switch src.Disposal[i-1] {
-            case gif.DisposalPrevious:
-                draw.Draw(quantizedFrame, bounds, newGif.Image[i-1], image.Point{}, draw.Over)
-            case gif.DisposalBackground:
-				for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
-                    for x := bounds.Min.X; x < bounds.Max.X; x++ {
-                        quantizedFrame.SetColorIndex(x, y, uint8(transparentIndex))
-                    }
-                }
-			}
-		}
 
 		for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 			for x := bounds.Min.X; x < bounds.Max.X; x++ {
-				r, g, b, a := dcImg.At(x, y).RGBA()
-				color := utils.NewColor(int(r>>8), int(g>>8), int(b>>8), int(a>>8))
+				i := y*dcImg.Stride + x*4
+				// Extract the RGBA values directly from the Pix slice
+				r := dcImg.Pix[i+0]
+				g := dcImg.Pix[i+1]
+				b := dcImg.Pix[i+2]
+				a := dcImg.Pix[i+3]
 				if a == 0 {
-					quantizedFrame.SetColorIndex(x, y, uint8(transparentIndex))
+					continue;
+				}
+
+				color := utils.NewColor(int(r), int(g), int(b), int(a));
+				index := quantizer.GetPaletteIndex(color);
+				// if disposalNone, then we modify the reusedImage again.
+				// when more frames gets parsed, this reusedImage gets populated more.
+				if disposal == gif.DisposalNone {
+					i := reusedImage.PixOffset(x, y);
+					reusedImage.Pix[i] = uint8(index);
 				} else {
-					index := quantizer.GetPaletteIndex(color)
-					quantizedFrame.SetColorIndex(x, y, uint8(index))
+					// regularImage is made in this loop, meaning it'll reset every frame.
+					regularImage.SetColorIndex(x, y, uint8(index));
 				}
 			}
 		}
 
-		newGif.Image = append(newGif.Image, quantizedFrame);
+		if disposal == gif.DisposalNone {
+			copiedReusedImage := image.NewPaletted(screenResolution, colorPalette)
+			copy(copiedReusedImage.Pix, reusedImage.Pix)
+			newGif.Image = append(newGif.Image, copiedReusedImage);
+		} else {
+			newGif.Image = append(newGif.Image, regularImage);
+		}
 		newGif.Delay = append(newGif.Delay, delay);
-		newGif.Disposal = append(newGif.Disposal, disposal);
+		newGif.Disposal = append(newGif.Disposal, 1);
 	}
+
 	newGif.LoopCount = src.LoopCount;
 	newGif.Config.Height = src.Config.Height;
 	newGif.Config.Width = src.Config.Width;
