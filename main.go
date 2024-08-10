@@ -10,7 +10,7 @@ import (
 	"image/png"
 	"log"
 	"os"
-	"regexp"
+	// "regexp"
 	"runtime/pprof"
 	"runtime/trace"
 
@@ -19,6 +19,22 @@ import (
 
 	"github.com/fogleman/gg"
 )
+
+func openImage(fp string) image.Image {
+	image_file, err := os.Open(fp);
+	if err != nil {
+		panic(err);
+	}
+	im := bufio.NewReader(image_file);
+	decoded_im, _, err := image.Decode(im);
+	if err != nil {
+		panic(err);
+	}
+	if err := image_file.Close(); err != nil {
+		panic(err);
+	}
+	return decoded_im;
+}
 
 func outputPalette(palette color.Palette, filename string) {
     pixelSize := 10
@@ -78,51 +94,28 @@ func runGifForMinimalist(filename string) {
 
 	fmt.Printf("Number of frames: %v\n", len(g.Image));
 
-	_, ferr := os.Stat("./images/minimalist/gifs/debug")
-	if os.IsNotExist(ferr) {
-		os.Mkdir("./images/minimalist/gifs/debug", os.ModePerm);
-	}
-
-	/*
-    // Initialize the octree quantizer
-    quantizer := utils.NewOctreeQuantizer()
-    // Add colors from each frame to the quantizer
-	utils.AddColorsToQuantizer(quantizer, g);
-    // Generate the palette
-    colorCount := 64
-	palette := quantizer.MakePalette(colorCount)
-	colorPalette := utils.ConvertToColorPalette(palette);
-	outputPalette(colorPalette, filename);
-
-	for i, img := range g.Image {
-		s := fmt.Sprintf("./images/minimalist/gifs/debug/%v-%v.png", filename, i);
-		f, err := os.Create(s);
-		if err != nil {
-			panic(err);
-		}
-		png.Encode(f, img);
-	}
-	*/
-	modified_gif := styles.ModifyMinimalistGif(g, &font, "The sky looks nice doesn't it?");
+	modified_gif := styles.ModifyMinimalistGif(g, &font, "Death.");
 	if err := gif.EncodeAll(f, modified_gif); err != nil {
 		panic(err);
 	}
 }
 
+
 func runImageForQuote() {
-	font, err := gg.LoadFontFace("./fonts/Lora-Italic.ttf", 25)
+	big_font, err := gg.LoadFontFace("./fonts/Mirador-Bold.ttf", 25 * 2);
+	if err != nil {
+		panic(err);
+	}
+	small_font, err := gg.LoadFontFace("./fonts/Mirador-BookItalic.ttf", 10 * 2);
 	if err != nil {
 		panic(err);
 	}
 	defer utils.Timer("sky gif")();
 
-	image_file, err := os.Open("./images/Moon.png");
-	if err != nil {
-		panic(err);
-	}
-	im := bufio.NewReader(image_file);
-	decoded_im, _, err := image.Decode(im);
-	quote_img := styles.ModifyQuoteImage(decoded_im, &font);
+	gradient := openImage("./images/quote/qgradient.png");
+	pfp := openImage("./images/pfp2.png");
+
+	quote_img := styles.ModifyQuoteImage(&pfp, &gradient, &big_font, &small_font);
 	quote_img.SavePNG("./images/quote/out_Moon.png");
 }
 
@@ -147,7 +140,8 @@ func main() {
 		defer trace.Stop();
 	}
 
-	// runImageForQuote();
+	runImageForQuote();
+	/*
 	files, err := os.ReadDir("./images/");
 	if err != nil {
 		log.Fatal(err);
@@ -162,4 +156,5 @@ func main() {
 		}
 		println();
 	}
+	*/
 }
