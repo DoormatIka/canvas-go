@@ -5,8 +5,6 @@ import (
 	"image"
 
 	"golang.org/x/image/font"
-
-	"github.com/disintegration/gift"
 	"github.com/fogleman/gg"
 
 	"canvas/lib/utils"
@@ -34,7 +32,6 @@ func ModifyMinimalistRGBA(src *image.RGBA, font *font.Face, text string) *image.
 	return &dcImg;
 }
 
-// this automatically adapts to the image resolutions
 func ComposeMinimalistFrameRGBA(
 	img *image.RGBA,
 	font font.Face,
@@ -45,26 +42,7 @@ func ComposeMinimalistFrameRGBA(
 	screenWidth := resolution.Max.X;
 	screenHeight := resolution.Max.Y;
 
-	var dc *gg.Context;
-	if screenHeight > 500 || screenWidth > 500 {
-		var newWidth, newHeight int 
-		// it should handle multiple image resolutions.
-		if screenHeight > screenWidth {
-			newHeight = 0
-			newWidth = screenWidth
-		} else {
-			newHeight = screenHeight
-			newWidth = 0
-		}
-		resizer := gift.New( // downscaling
-			gift.Resize(newWidth, newHeight, gift.LanczosResampling),
-		)
-		dst := image.NewRGBA(resizer.Bounds(image.Rect(0, 0, screenWidth, screenHeight)));
-		resizer.Draw(dst, img);
-		dc = gg.NewContextForImage(dst);
-	} else {
-		dc = gg.NewContextForImage(img);
-	}
+	dc := gg.NewContextForImage(img);
 
 	var r, g, b int;
 	if average_luminosity > 150 {

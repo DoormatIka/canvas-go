@@ -10,7 +10,7 @@ import (
 	"image/png"
 	"log"
 	"os"
-	// "regexp"
+	"regexp"
 	"runtime/pprof"
 	"runtime/trace"
 
@@ -100,13 +100,18 @@ func runGifForMinimalist(filename string) {
 	}
 }
 
+type Text struct {
+	filename string
+	author string
+	text string
+}
 
 func runImageForQuote() {
-	big_font, err := gg.LoadFontFace("./fonts/Mirador-Bold.ttf", 25 * 2);
+	big_font, err := gg.LoadFontFace("./fonts/Mirador-SemiBold.ttf", 25 * 2);
 	if err != nil {
 		panic(err);
 	}
-	small_font, err := gg.LoadFontFace("./fonts/Mirador-BookItalic.ttf", 10 * 2);
+	small_font, err := gg.LoadFontFace("./fonts/Mirador-BookItalic.ttf", 10 * 2.5);
 	if err != nil {
 		panic(err);
 	}
@@ -115,13 +120,23 @@ func runImageForQuote() {
 	gradient := openImage("./images/quote/qgradient.png");
 	pfp := openImage("./images/pfp2.png");
 
-	quote_img := styles.ModifyQuoteImage(&pfp, &gradient, &big_font, &small_font);
-	quote_img.SavePNG("./images/quote/out_Moon.png");
+	arrTexts := []Text{
+		{ filename: "out_long.png", author: "- Lorem", text: "Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer took a galley of type and scrambled it to make a type specimen book." },
+		{ filename: "out_normal.png", author: "- Normal", text: "Reason why I'm not watching the arcane leak" },
+		{ filename: "out_one_word.png", author: "- Normal Person", text: "Cum." },
+	};
+
+	for _, v := range arrTexts {
+		quote_img := styles.ModifyQuoteImage(v.text, v.author, &pfp, &gradient, &big_font, &small_font);
+		quote_img.SavePNG("./images/quote/" + v.filename);
+	}
+
 }
 
 var cpuprofile = flag.String("cpuprofile", "", "write cpu profile to file");
 var memorytrace = flag.String("memorytrace", "", "write memory trace to file");
 func main() {
+	// println("I think everything works?");
 	flag.Parse();
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile);
@@ -141,7 +156,6 @@ func main() {
 	}
 
 	runImageForQuote();
-	/*
 	files, err := os.ReadDir("./images/");
 	if err != nil {
 		log.Fatal(err);
@@ -156,5 +170,6 @@ func main() {
 		}
 		println();
 	}
-	*/
 }
+
+

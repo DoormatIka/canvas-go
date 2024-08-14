@@ -1,6 +1,7 @@
 package styles
 
 import (
+	"fmt"
 	"image"
 	"image/gif"
 
@@ -25,6 +26,22 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
     colorCount := 256;
 	palette := quantizer.MakePalette(colorCount)
 	colorPalette := utils.ConvertToColorPalette(palette);
+
+	count := make(map[int]int);
+	total := 0;
+	arrLevel := make([][]*utils.OctreeNode, len(quantizer.Levels));
+	for k, v := range quantizer.Levels {
+		contents := v;
+		arrLevel[k] = contents;
+	}
+	for k, v := range arrLevel {
+		for range v {
+			count[k] += 1;
+		}
+		fmt.Printf("Level: %d, Number of nodes: %d\n", k, count[k]);
+		total += count[k];
+	}
+	fmt.Printf("Total number of nodes: %d\n", total);
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
 	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
@@ -113,17 +130,10 @@ func ComposeMinimalistFrameGif(
 		dc = gg.NewContextForImage(img);
 	}
 
-	var r, g, b int;
+	r, g, b := 255, 255, 255;
 	if average_luminosity > 150 {
-		r = 0;
-		g = 0;
-		b = 0;
-	} else {
-		r = 255;
-		g = 255;
-		b = 255;
+		r, g, b = 0, 0, 0;
 	}
-
 	dc.SetFontFace(font);
 
 	offset := 10.0;

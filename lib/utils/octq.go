@@ -75,6 +75,15 @@ func (node *OctreeNode) AddColor(color Color, level int, parent *OctreeQuantizer
         return
     }
     index := node.GetColorIndexForLevel(color, level)
+	// node.Children[index] dereferences to an OctreeNode
+	// 		i think this will take time because an OctreeNode is a big struct.
+	// 		storing indices instead and labelling empty nodes as -1 would help with this.
+	// 		you still need to deref but it'll be cheaper, and hopefully faster.
+
+	// a side note: we're doing the indices on the tree-like structure
+	// 				but the children are stored in an array.
+	// we're probably not going to iterate over the children array so storing it this way is fine.
+	// i just want to minimize the perf impact of dereferencing
     if node.Children[index] == nil {
         node.Children[index] = NewOctreeNode(level, parent)
     }
@@ -215,7 +224,7 @@ func AddColorsToQuantizer(q *OctreeQuantizer, g *gif.GIF) {
             for x := bounds.Min.X; x < bounds.Max.X; x++ {
                 r, g, b, a := frame.At(x, y).RGBA()
                 color := NewColor(int(r>>8), int(g>>8), int(b>>8), int(a>>8))
-                q.AddColor(color)
+                q.AddColor(color) // called every pixel in every frame!
             }
         }
     }
