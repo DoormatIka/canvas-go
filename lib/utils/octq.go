@@ -19,7 +19,8 @@ type OctreeNode struct {
 const MaxDepth = 8
 
 type OctreeQuantizer struct {
-    Levels map[int][]*OctreeNode
+	// this is probably to get what level the octree node is on.
+    Levels map[int][]*OctreeNode // WHY IS THIS ALLOCATED ARGHHH
     Root   *OctreeNode
 }
 
@@ -75,15 +76,6 @@ func (node *OctreeNode) AddColor(color Color, level int, parent *OctreeQuantizer
         return
     }
     index := node.GetColorIndexForLevel(color, level)
-	// node.Children[index] dereferences to an OctreeNode
-	// 		i think this will take time because an OctreeNode is a big struct.
-	// 		storing indices instead and labelling empty nodes as -1 would help with this.
-	// 		you still need to deref but it'll be cheaper, and hopefully faster.
-
-	// a side note: we're doing the indices on the tree-like structure
-	// 				but the children are stored in an array.
-	// we're probably not going to iterate over the children array so storing it this way is fine.
-	// i just want to minimize the perf impact of dereferencing
     if node.Children[index] == nil {
         node.Children[index] = NewOctreeNode(level, parent)
     }
