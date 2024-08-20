@@ -20,35 +20,22 @@ type GifFrame struct {
 
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
-	/*
+
     quantizer := utils.NewOctreeQuantizer()
 	utils.AddColorsToQuantizer(quantizer, src);
     colorCount := 256; // colors. 256 before.
 	palette := quantizer.MakePalette(colorCount)
 	colorPalette := utils.ConvertToColorPalette(palette);
-	*/
+
+	/*
 	quantizer := utils.NewFlatOctree();
 	utils.AddColorsToFlatOctree(quantizer, src);
 	colorCount := 256;
 	palette := quantizer.MakePalette(colorCount);
 	colorPalette := utils.ConvertToColorPalette(palette);
-	fmt.Printf("Length of color palette: %d\n", len(colorPalette));
+	*/
 
-	count := make(map[int]int);
-	total := 0;
-	arrLevel := make([][]*utils.FlatOctreeNodeIndex, len(quantizer.Levels));
-	for k, v := range quantizer.Levels {
-		contents := v;
-		arrLevel[k] = contents;
-	}
-	for k, v := range arrLevel {
-		for range v {
-			count[k] += 1;
-		}
-		fmt.Printf("Level: %d, Number of nodes: %d\n", k, count[k]);
-		total += count[k];
-	}
-	fmt.Printf("Total number of nodes: %d\n", total);
+	fmt.Printf("Length of color palette: %d\n", len(colorPalette));
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
 	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);

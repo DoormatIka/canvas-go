@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"image/gif"
 )
 
@@ -15,7 +16,7 @@ type FlatOctreeNodeIndex struct {
 }
 type FlatOctree struct {
 	Root  FlatOctreeNodeIndex // a tree of ints pointing to FlatOctree.Nodes
-	Leaves []int // ints pointing to FlatOctree.Nodes
+	Leaves []FlatOctreeNode // ints pointing to FlatOctree.Nodes, not used.
 	Nodes []FlatOctreeNode
     Levels map[int][]*FlatOctreeNodeIndex
 }
@@ -27,25 +28,29 @@ func NewNodeIndex(index int) FlatOctreeNodeIndex {
 
 func NewFlatOctree() *FlatOctree {
     quantizer := &FlatOctree {
+		Nodes: []FlatOctreeNode{},
         Levels: make(map[int][]*FlatOctreeNodeIndex),
     }
-	quantizer.Nodes = append(quantizer.Nodes, *NewFlatNode(0, quantizer));
-	quantizer.Root = NewNodeIndex(len(quantizer.Nodes)-1);
+	index := *NewFlatNode(0, quantizer);
+	quantizer.Root = index;
     return quantizer
 }
 
-func NewFlatNode(level int, parent *FlatOctree) *FlatOctreeNode {
+// appends to quantizer.Nodes automatically. my bad.
+// returns the index in that node.
+func NewFlatNode(level int, parent *FlatOctree) *FlatOctreeNodeIndex {
     node := FlatOctreeNode{
         Color: Color{0, 0, 0, 0},
     }
+
 	parent.Nodes = append(parent.Nodes, node);
 	n := NewNodeIndex(len(parent.Nodes)-1);
+
     if level < MaxDepth-1 {
         parent.AddLevelNode(level, &n)
     }
-    return &node;
+    return &n;
 }
-
 func (octree *FlatOctree) AddLevelNode(level int, node *FlatOctreeNodeIndex) {
     octree.Levels[level] = append(octree.Levels[level], node);
 }
@@ -55,7 +60,7 @@ func (quantizer *FlatOctree) AddColor(color Color) {
 }
 func (ind *FlatOctreeNodeIndex) AddColor(color Color, level int, parent *FlatOctree) {
 	if level >= MaxDepth {
-		node := parent.Nodes[ind.Index];
+		node := &parent.Nodes[ind.Index];
 
 		node.Color.Red += color.Red
 		node.Color.Green += color.Green
@@ -65,15 +70,9 @@ func (ind *FlatOctreeNodeIndex) AddColor(color Color, level int, parent *FlatOct
 		return
 	}
     index := GetColorIndexForLevel(color, level)
-
-	// FlatOctreeNodeIndex is cheaper to deref than the FlatOctreeNode.
-	// which gets called every time, instead of FlatOctreeNode being called every traversal.
-	// i could probably skip the traversal entirely if i knew how the octree worked.
-	// i could convert this into an O(1) operation.. :D
     if ind.Children[index] == nil {
-		parent.Nodes = append(parent.Nodes, *NewFlatNode(level, parent));
-		n := NewNodeIndex(len(parent.Nodes) - 1);
-        ind.Children[index] = &n;
+		n := NewFlatNode(level, parent);
+        ind.Children[index] = n;
     }
 	ind.Children[index].AddColor(color, level+1, parent);
 }
@@ -123,27 +122,31 @@ func (ind *FlatOctreeNodeIndex) RemoveLeaves(parent *FlatOctree) int {
     result := 0
     for i := range ind.Children {
         if ind.Children[i] != nil {
-			node := parent.Nodes[ind.Index];
-			child := parent.Nodes[ind.Children[i].Index];
-            node.Color.Red += child.Color.Red
-            node.Color.Green += child.Color.Green
-            node.Color.Blue += child.Color.Blue
-            node.Color.Alpha += child.Color.Alpha
-            node.PixelCount += child.PixelCount
-            result++
+			node := &parent.Nodes[ind.Index];
+			child := &parent.Nodes[ind.Children[i].Index];
+			if child.IsLeaf() {
+				node.Color.Red += child.Color.Red
+				node.Color.Green += child.Color.Green
+				node.Color.Blue += child.Color.Blue
+				node.Color.Alpha += child.Color.Alpha
+				node.PixelCount += child.PixelCount
+				result++
+			} // change.
         }
     }
     return result - 1
 }
 
+
 func (quantizer *FlatOctree) MakePalette(colorCount int) []Color {
     var palette []Color
     paletteIndex := 0
     leafCount := len(quantizer.GetLeaves())
+	fmt.Printf("Before removal, Length of leaves: %d\n", leafCount);
     for level := MaxDepth - 1; level >= 0; level-- {
         if nodes, exists := quantizer.Levels[level]; exists {
-            for _, node := range nodes {
-                leafCount -= node.RemoveLeaves(quantizer);
+            for _, ind := range nodes {
+                leafCount -= ind.RemoveLeaves(quantizer);
                 if leafCount <= colorCount {
                     break
                 }
@@ -154,11 +157,13 @@ func (quantizer *FlatOctree) MakePalette(colorCount int) []Color {
             quantizer.Levels[level] = nil
         }
     }
-    for _, ind := range quantizer.GetLeaves() {
-		node := quantizer.Nodes[ind];
+	leaves := quantizer.GetLeaves();
+	fmt.Printf("Length of leaves: %d\n", len(leaves));
+    for _, ind := range leaves {
         if paletteIndex >= colorCount {
             break
         }
+		node := quantizer.Nodes[ind];
         if node.IsLeaf() {
             palette = append(palette, node.GetColor());
             node.PaletteIndex = paletteIndex

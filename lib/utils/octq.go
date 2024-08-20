@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"fmt"
 	"image/color"
 	"image/gif"
 )
@@ -20,7 +21,8 @@ const MaxDepth = 8
 
 type OctreeQuantizer struct {
 	// this is probably to get what level the octree node is on.
-    Levels map[int][]*OctreeNode // WHY IS THIS ALLOCATED ARGHHH
+    Levels map[int][]*OctreeNode
+	Leaves []OctreeNode
     Root   *OctreeNode
 }
 
@@ -76,6 +78,7 @@ func (node *OctreeNode) AddColor(color Color, level int, parent *OctreeQuantizer
         return
     }
     index := node.GetColorIndexForLevel(color, level)
+	// the deref happens here!
     if node.Children[index] == nil {
         node.Children[index] = NewOctreeNode(level, parent)
     }
@@ -109,6 +112,7 @@ func (node *OctreeNode) RemoveLeaves() int {
             node.PixelCount += node.Children[i].PixelCount
             result++
         }
+		node.Children[i] = nil;
     }
     return result - 1
 }
@@ -164,6 +168,7 @@ func (quantizer *OctreeQuantizer) MakePalette(colorCount int) []Color {
     var palette []Color
     paletteIndex := 0
     leafCount := len(quantizer.GetLeaves())
+	fmt.Printf("Before removal, Length of leaves: %d\n", leafCount);
     for level := MaxDepth - 1; level >= 0; level-- {
         if nodes, exists := quantizer.Levels[level]; exists {
             for _, node := range nodes {
@@ -178,7 +183,9 @@ func (quantizer *OctreeQuantizer) MakePalette(colorCount int) []Color {
             quantizer.Levels[level] = nil
         }
     }
-    for _, node := range quantizer.GetLeaves() {
+	leaves := quantizer.GetLeaves();
+	fmt.Printf("After removal, Length of leaves: %d\n", len(leaves));
+    for _, node := range leaves {
         if paletteIndex >= colorCount {
             break
         }
