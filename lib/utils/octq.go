@@ -22,7 +22,6 @@ const MaxDepth = 8
 type OctreeQuantizer struct {
 	// this is probably to get what level the octree node is on.
     Levels map[int][]*OctreeNode
-	Leaves []OctreeNode
     Root   *OctreeNode
 }
 

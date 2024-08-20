@@ -1,8 +1,9 @@
 package styles
 
 import (
-	"fmt"
 	"image"
+	"image/color/palette"
+	"image/draw"
 	"image/gif"
 
 	"golang.org/x/image/font"
@@ -18,6 +19,38 @@ type GifFrame struct {
 	index int
 }
 
+func ModifyMinimalistGifDrawDraw(src *gif.GIF, font *font.Face, text string) *gif.GIF {
+	newGif := &gif.GIF{};
+
+	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
+	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
+
+	for i := 0; i < len(src.Image); i++ {
+		img := src.Image[i];
+		delay := src.Delay[i];
+
+		regularImage := image.NewPaletted(screenResolution, palette.Plan9);
+
+		dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
+		dcImg := dc.Image().(*image.RGBA);
+		bounds := dcImg.Bounds();
+
+		draw.Draw(regularImage, bounds, dcImg, image.Pt(0, 0), draw.Over);
+
+		newGif.Image = append(newGif.Image, regularImage);
+		newGif.Delay = append(newGif.Delay, delay);
+		newGif.Disposal = append(newGif.Disposal, 1);
+	}
+
+	newGif.LoopCount = src.LoopCount;
+	newGif.Config.Height = src.Config.Height;
+	newGif.Config.Width = src.Config.Width;
+	newGif.Config.ColorModel = src.Config.ColorModel;
+	newGif.BackgroundIndex = src.BackgroundIndex;
+
+	return newGif;
+}
+
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 	newGif := &gif.GIF{};
 
@@ -26,16 +59,6 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
     colorCount := 256; // colors. 256 before.
 	palette := quantizer.MakePalette(colorCount)
 	colorPalette := utils.ConvertToColorPalette(palette);
-
-	/*
-	quantizer := utils.NewFlatOctree();
-	utils.AddColorsToFlatOctree(quantizer, src);
-	colorCount := 256;
-	palette := quantizer.MakePalette(colorCount);
-	colorPalette := utils.ConvertToColorPalette(palette);
-	*/
-
-	fmt.Printf("Length of color palette: %d\n", len(colorPalette));
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
 	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);

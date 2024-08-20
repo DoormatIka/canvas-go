@@ -94,7 +94,8 @@ func runGifForMinimalist(filename string) {
 
 	fmt.Printf("Number of frames: %v\n", len(g.Image));
 
-	modified_gif := styles.ModifyMinimalistGif(g, &font, "Death.");
+	// modified_gif := styles.ModifyMinimalistGif(g, &font, "Death.");
+	modified_gif := styles.ModifyMinimalistGifDrawDraw(g, &font, "Death.");
 	if err := gif.EncodeAll(f, modified_gif); err != nil {
 		panic(err);
 	}
@@ -166,6 +167,7 @@ func main() {
 			continue;
 		}
 		if reg.Match([]byte(file.Name())) {
+			println(file.Name());
 			runGifForMinimalist(file.Name());
 		}
 		println();
