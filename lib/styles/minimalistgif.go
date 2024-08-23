@@ -2,8 +2,6 @@ package styles
 
 import (
 	"image"
-	"image/color/palette"
-	"image/draw"
 	"image/gif"
 
 	"golang.org/x/image/font"
@@ -17,38 +15,6 @@ type GifFrame struct {
 	palettedImage *image.Paletted
 	delay int
 	index int
-}
-
-func ModifyMinimalistGifDrawDraw(src *gif.GIF, font *font.Face, text string) *gif.GIF {
-	newGif := &gif.GIF{};
-
-	average_luminosity, _ := utils.GetAverageBrightnessOfPalettedImage(src.Image[0], src.Config.Width, src.Config.Height);
-	screenResolution := image.Rect(0, 0, src.Config.Width, src.Config.Height);
-
-	for i := 0; i < len(src.Image); i++ {
-		img := src.Image[i];
-		delay := src.Delay[i];
-
-		regularImage := image.NewPaletted(screenResolution, palette.Plan9);
-
-		dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
-		dcImg := dc.Image().(*image.RGBA);
-		bounds := dcImg.Bounds();
-
-		draw.Draw(regularImage, bounds, dcImg, image.Pt(0, 0), draw.Over);
-
-		newGif.Image = append(newGif.Image, regularImage);
-		newGif.Delay = append(newGif.Delay, delay);
-		newGif.Disposal = append(newGif.Disposal, 1);
-	}
-
-	newGif.LoopCount = src.LoopCount;
-	newGif.Config.Height = src.Config.Height;
-	newGif.Config.Width = src.Config.Width;
-	newGif.Config.ColorModel = src.Config.ColorModel;
-	newGif.BackgroundIndex = src.BackgroundIndex;
-
-	return newGif;
 }
 
 func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
@@ -73,7 +39,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 
 		regularImage := image.NewPaletted(screenResolution, colorPalette);
 
-		dc := ComposeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
+		dc := composeMinimalistFrameGif(img, *font, text, screenResolution, average_luminosity);
 		dcImg := dc.Image().(*image.RGBA);
 		bounds := dcImg.Bounds();
 
@@ -124,7 +90,7 @@ func ModifyMinimalistGif(src *gif.GIF, font *font.Face, text string) *gif.GIF {
 }
 
 // this automatically adapts to the image resolutions
-func ComposeMinimalistFrameGif(
+func composeMinimalistFrameGif(
 	img *image.Paletted,
 	font font.Face,
 	text string, 
@@ -164,12 +130,6 @@ func ComposeMinimalistFrameGif(
 		text,
 		float64(dc.Width()), // x
 		float64(dc.Height()) / 2, // y
-		/*
-			The anchor point is x - w * ax, y - h * ay, 
-				where w, h is the size of the image. 
-			Use ax=0.5, ay=0.5 to center 
-				the image at the specified point.
-		*/
 		1.1, // ax (anchor x)
 		0.5, // ay (anchor y)
 		float64(dc.Width()) / 2, // width

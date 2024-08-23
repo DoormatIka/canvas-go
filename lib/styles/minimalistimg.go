@@ -13,26 +13,26 @@ import (
 func ModifyMinimalistImage(src *image.Image, font *font.Face, text string) (*image.Image, error) {
 	switch im := (*src).(type) {
 	case *image.RGBA:
-		return ModifyMinimalistRGBA(im, font, text), nil;
+		return modifyMinimalistRGBA(im, font, text), nil;
 	default:
 		return nil, fmt.Errorf("Image is not of type RGBA.");
 	}
 }
 
 // for use in images.
-func ModifyMinimalistRGBA(src *image.RGBA, font *font.Face, text string) *image.Image {
+func modifyMinimalistRGBA(src *image.RGBA, font *font.Face, text string) *image.Image {
 	width, height := src.Rect.Max.X, src.Rect.Max.Y;
 
 	average_luminosity, _ := utils.GetAverageBrightnessOfRGBA(src, width, height);
 	screenResolution := image.Rect(0, 0, width, height);
 
-	dc := ComposeMinimalistFrameRGBA(src, *font, text, screenResolution, average_luminosity);
+	dc := composeMinimalistFrameRGBA(src, *font, text, screenResolution, average_luminosity);
 	dcImg := dc.Image();
 
 	return &dcImg;
 }
 
-func ComposeMinimalistFrameRGBA(
+func composeMinimalistFrameRGBA(
 	img *image.RGBA,
 	font font.Face,
 	text string, 
