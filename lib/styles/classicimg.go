@@ -45,8 +45,9 @@ func composeClassicImage(
 
 	dc.SetFontFace(font);
 	s := dc.WordWrap(text, wrap_width);
-
-	s = s[:line_limit];
+	if len(s) > line_limit {
+		s = s[:line_limit];
+	}
 	stext := strings.Join(s, "\n");
 
 	var total_text_height float64 = 0;
